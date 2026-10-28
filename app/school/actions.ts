@@ -10,19 +10,18 @@ export async function buySeats(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not logged in' }
 
-  // Get the admin's institution
+  // Fix: Add the type cast here to fix the 'prefix' error
   const { data: profile } = await supabase
     .from('profiles')
     .select('institution_id, institutions(prefix)')
     .eq('id', user.id)
-    .single()
+    .single() as { data: any, error: any }
 
   if (!profile?.institution_id) return { error: 'No institution linked' }
 
   // MOCK PAYMENT GATEWAY: Imagine an M-Pesa STK push happens here
-  // await processPayment(user.id, amount * 100) // e.g., 100 KES per seat
+  // await processPayment(user.id, amount * 500)
 
-  // Generate the tickets
   const prefix = profile.institutions?.prefix || 'SCH'
   const newTickets = Array.from({ length: amount }).map(() => ({
     institution_id: profile.institution_id,

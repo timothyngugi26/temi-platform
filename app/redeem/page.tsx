@@ -12,6 +12,7 @@ export default function RedeemPage() {
           </p>
         </div>
 
+        {/* The action is now typed correctly as Promise<void> */}
         <form action={redeemTicket} className="p-8 space-y-5">
           <div>
             <label className="block text-sm font-semibold text-[#1A2E1A] mb-1">Ticket Code</label>
