@@ -7,6 +7,7 @@ import Link from 'next/link'
 
 export default function AdminDashboard() {
   const [institutions, setInstitutions] = useState<any[]>([])
+  const [applications, setApplications] = useState<any[]>([])
   const [name, setName] = useState('')
   const [prefix, setPrefix] = useState('')
   const [loading, setLoading] = useState(true)
@@ -31,17 +32,27 @@ export default function AdminDashboard() {
         return router.push('/feed') // Kick out non-admins
       }
 
-      fetchInstitutions()
+      fetchData()
     }
     checkAdminAndFetch()
   }, [supabase, router])
 
-  const fetchInstitutions = async () => {
-    const { data } = await supabase
+  const fetchData = async () => {
+    // Fetch Institutions
+    const { data: instData } = await supabase
       .from('institutions')
       .select('*')
       .order('created_at', { ascending: false })
-    if (data) setInstitutions(data)
+    if (instData) setInstitutions(instData)
+
+    // Fetch Pending Scout Applications
+    const { data: apps } = await supabase
+      .from('scout_applications')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    if (apps) setApplications(apps)
+    
     setLoading(false)
   }
 
@@ -63,9 +74,26 @@ export default function AdminDashboard() {
       setMessage('School onboarded successfully!')
       setName('')
       setPrefix('')
-      fetchInstitutions()
+      fetchData()
     }
     setCreating(false)
+  }
+
+  const handleApproveScout = async (app: any) => {
+    // In production, you would send an email invite using supabaseAdmin.auth.admin.inviteUserByEmail(app.work_email)
+    alert(`Approved! An invitation email would be sent to ${app.work_email}.`)
+
+    // Mark as approved
+    const { error } = await supabase
+      .from('scout_applications')
+      .update({ status: 'approved' })
+      .eq('id', app.id)
+    
+    if (error) {
+      alert("Error approving: " + error.message)
+    } else {
+      fetchData()
+    }
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white font-bold">Loading Admin Portal...</div>
@@ -160,6 +188,40 @@ export default function AdminDashboard() {
           </div>
 
         </div>
+
+        {/* PENDING SCOUT APPLICATIONS */}
+        <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-xl mt-8">
+          <h2 className="text-xl font-bold text-white font-serif mb-4">💼 Pending Scout Applications</h2>
+          
+          {applications.length === 0 ? (
+            <p className="text-gray-500 text-sm">No pending applications.</p>
+          ) : (
+            <div className="space-y-3">
+              {applications.map((app) => (
+                <div key={app.id} className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-900 p-4 rounded-xl border border-gray-700 gap-4">
+                  <div>
+                    <h3 className="font-bold text-white">{app.company_name}</h3>
+                    <p className="text-sm text-gray-400">{app.contact_name} • {app.work_email}</p>
+                    {app.website && (
+                      <a href={app.website} target="_blank" rel="noopener noreferrer" className="text-xs text-[#FFB703] hover:underline">
+                        Visit Website →
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleApproveScout(app)} 
+                      className="px-4 py-2 text-sm font-bold text-white bg-[#4E9F3D] rounded-lg hover:bg-[#0F380F] transition-colors"
+                    >
+                      Approve & Invite
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
       </main>
     </div>
   )

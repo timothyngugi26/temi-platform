@@ -2,17 +2,48 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/utils/supabase/client'
 
 export default function ContactPage() {
   const [formType, setFormType] = useState<'school' | 'scout'>('school')
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Form State
+  const [companyName, setCompanyName] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [email, setEmail] = useState('')
+  const [website, setWebsite] = useState('')
+  
+  const supabase = createClient()
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would send an email or save to a database
-    setTimeout(() => {
-      setSubmitted(true)
-    }, 1000)
+    setLoading(true)
+    setError('')
+
+    if (formType === 'scout') {
+      // Save Scout Application to DB
+      const { error: dbError } = await supabase.from('scout_applications').insert({
+        company_name: companyName,
+        contact_name: contactName,
+        work_email: email,
+        website: website
+      })
+
+      if (dbError) {
+        setError(dbError.message)
+        setLoading(false)
+        return
+      }
+    } else {
+      // School Partnership is currently a mock form
+      await new Promise(r => setTimeout(r, 1000))
+    }
+
+    setLoading(false)
+    setSubmitted(true)
   }
 
   return (
@@ -42,13 +73,13 @@ export default function ContactPage() {
           {/* Toggle */}
           <div className="flex border-b border-[#E2E8E2]">
             <button 
-              onClick={() => { setFormType('school'); setSubmitted(false) }}
+              onClick={() => { setFormType('school'); setSubmitted(false); setError('') }}
               className={`flex-1 py-4 text-center font-bold transition-colors ${formType === 'school' ? 'bg-[#F4F7F4] text-[#0F380F] border-b-2 border-[#0F380F]' : 'text-[#6B7C6B] hover:bg-gray-50'}`}
             >
               🏫 For Schools
             </button>
             <button 
-              onClick={() => { setFormType('scout'); setSubmitted(false) }}
+              onClick={() => { setFormType('scout'); setSubmitted(false); setError('') }}
               className={`flex-1 py-4 text-center font-bold transition-colors ${formType === 'scout' ? 'bg-[#F4F7F4] text-[#0F380F] border-b-2 border-[#0F380F]' : 'text-[#6B7C6B] hover:bg-gray-50'}`}
             >
               💼 For Corporates
@@ -74,12 +105,16 @@ export default function ContactPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
+                {error && <div className="bg-red-50 text-red-500 text-sm font-semibold p-3 rounded-lg">{error}</div>}
+                
                 <div>
                   <label className="block text-sm font-semibold text-[#1A2E1A] mb-1">
                     {formType === 'school' ? 'Institution Name' : 'Company Name'}
                   </label>
                   <input 
                     type="text" 
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
                     required
                     placeholder={formType === 'school' ? 'e.g., University of Nairobi' : 'e.g., Safaricom PLC'}
                     className="w-full px-4 py-3 rounded-xl border border-[#E2E8E2] focus:outline-none focus:ring-2 focus:ring-[#4E9F3D] bg-[#F4F7F4]"
@@ -91,6 +126,8 @@ export default function ContactPage() {
                     <label className="block text-sm font-semibold text-[#1A2E1A] mb-1">Contact Person</label>
                     <input 
                       type="text" 
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
                       required
                       placeholder="Full Name"
                       className="w-full px-4 py-3 rounded-xl border border-[#E2E8E2] focus:outline-none focus:ring-2 focus:ring-[#4E9F3D] bg-[#F4F7F4]"
@@ -100,12 +137,28 @@ export default function ContactPage() {
                     <label className="block text-sm font-semibold text-[#1A2E1A] mb-1">Work Email</label>
                     <input 
                       type="email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="you@organization.com"
                       className="w-full px-4 py-3 rounded-xl border border-[#E2E8E2] focus:outline-none focus:ring-2 focus:ring-[#4E9F3D] bg-[#F4F7F4]"
                     />
                   </div>
                 </div>
+
+                {formType === 'scout' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-[#1A2E1A] mb-1">Company Website / LinkedIn</label>
+                    <input 
+                      type="url" 
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      required
+                      placeholder="https://linkedin.com/company/..."
+                      className="w-full px-4 py-3 rounded-xl border border-[#E2E8E2] focus:outline-none focus:ring-2 focus:ring-[#4E9F3D] bg-[#F4F7F4]"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-[#1A2E1A] mb-1">
@@ -121,9 +174,10 @@ export default function ContactPage() {
 
                 <button 
                   type="submit" 
-                  className="w-full bg-[#1E5128] hover:bg-[#0F380F] text-white font-bold py-4 rounded-xl transition-colors mt-4 shadow-md"
+                  disabled={loading}
+                  className="w-full bg-[#1E5128] hover:bg-[#0F380F] text-white font-bold py-4 rounded-xl transition-colors mt-4 shadow-md disabled:opacity-50"
                 >
-                  Submit Application
+                  {loading ? 'Submitting...' : 'Submit Application'}
                 </button>
               </form>
             )}

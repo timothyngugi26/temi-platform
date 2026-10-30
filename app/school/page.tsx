@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 
 export default function SchoolDashboard() {
   const [tickets, setTickets] = useState<any[]>([])
+  const [withdrawals, setWithdrawals] = useState<any[]>([])
   const [walletBalance, setWalletBalance] = useState(0)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -35,12 +36,21 @@ export default function SchoolDashboard() {
     }
 
     // Fetch Tickets
-    const { data, error } = await supabase
+    const { data: ticketData } = await supabase
       .from('tickets')
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (!error && data) setTickets(data)
+    if (ticketData) setTickets(ticketData)
+
+    // Fetch Pending Withdrawals (Only for this admin's school)
+    const { data: wdData } = await supabase
+      .from('withdrawal_requests')
+      .select('*, profiles!student_id(full_name, institution_id)')
+      .eq('status', 'pending')
+    
+    if (wdData) setWithdrawals(wdData)
+    
     setLoading(false)
   }
 
@@ -50,8 +60,8 @@ export default function SchoolDashboard() {
 
     setGenerating(true)
     
-    // Call the secure database function we wrote in Step 1
-    const { data, error } = await supabase.rpc('generate_school_tickets', {
+    // Call the secure database function
+    const { error } = await supabase.rpc('generate_school_tickets', {
       amount_to_generate: amount
     })
 
@@ -62,6 +72,19 @@ export default function SchoolDashboard() {
       fetchData()
     }
     setGenerating(false)
+  }
+
+  const handleWithdrawalAction = async (id: string, status: 'approved' | 'rejected') => {
+    const { error } = await supabase
+      .from('withdrawal_requests')
+      .update({ status })
+      .eq('id', id)
+      
+    if (error) {
+      alert("Error updating request: " + error.message)
+    } else {
+      fetchData()
+    }
   }
 
   // Math for the UI
@@ -150,6 +173,44 @@ export default function SchoolDashboard() {
                   }`}>
                     {ticket.is_redeemed ? 'Used' : 'Active'}
                   </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* PENDING WITHDRAWALS */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E2E8E2]">
+          <h2 className="text-xl font-bold text-[#0F380F] font-serif mb-4">🔔 Pending Withdrawals</h2>
+          
+          {withdrawals.length === 0 ? (
+            <div className="text-center py-8 bg-[#F4F7F4] rounded-xl border border-[#E2E8E2]">
+              <p className="text-[#6B7C6B] text-sm">No pending withdrawal requests.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {withdrawals.map((w) => (
+                <div key={w.id} className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#F4F7F4] p-4 rounded-xl border border-[#E2E8E2] gap-4">
+                  <div>
+                    <p className="font-bold text-[#0F380F]">
+                      {w.profiles?.full_name} — <span className="text-[#4E9F3D]">${Number(w.amount).toFixed(2)}</span>
+                    </p>
+                    <p className="text-sm text-[#6B7C6B] mt-1">"{w.reason}"</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleWithdrawalAction(w.id, 'rejected')} 
+                      className="px-4 py-2 text-sm font-bold text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      Reject
+                    </button>
+                    <button 
+                      onClick={() => handleWithdrawalAction(w.id, 'approved')} 
+                      className="px-4 py-2 text-sm font-bold text-white bg-[#4E9F3D] rounded-lg hover:bg-[#0F380F] transition-colors"
+                    >
+                      Approve
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

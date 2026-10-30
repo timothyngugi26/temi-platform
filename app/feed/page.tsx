@@ -11,6 +11,10 @@ import NotificationBell from './NotificationBell'
 import Comments from './Comments'
 import LikeButton from './LikeButton'
 import MessageButton from './MessageButton'
+import PostOptions from './PostOptions'
+import GiftButton from './GiftButton'
+import GiftWallet from './GiftWallet'
+import ShareButton from './ShareButton'
 
 async function FeedContent() {
   const supabase = await createClient()
@@ -30,10 +34,10 @@ async function FeedContent() {
     redirect('/school')
   }
 
-  // 1. Fetch Posts (including likes and project requests)
+  // 1. Fetch Posts (including likes, project requests, and gifts)
   const { data: posts } = await supabase
     .from('projects')
-    .select('*, profiles(full_name, institution_id, avatar_url), project_requests(*, profiles(full_name, avatar_url)), likes(user_id)')
+    .select('*, profiles(full_name, institution_id, avatar_url), project_requests(*, profiles(full_name, avatar_url)), likes(user_id), gifts(gift_type, is_anonymous, amount)')
     .order('created_at', { ascending: false })
 
   // 2. Fetch the Chapati Party Leaderboard
@@ -110,7 +114,7 @@ async function FeedContent() {
           </div>
         )}
 
-        {/* CHAPATI PARTY LEADERBOARD (Now Clickable) */}
+        {/* CHAPATI PARTY LEADERBOARD */}
         <Link href="/leaderboard" className="block mt-6 group">
           <div className="bg-gradient-to-r from-[#0F380F] to-[#1E5128] rounded-3xl p-6 shadow-lg text-white relative overflow-hidden group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-300">
             <div className="absolute -right-10 -top-10 w-40 h-40 bg-white opacity-10 rounded-full"></div>
@@ -145,6 +149,9 @@ async function FeedContent() {
           </div>
         </Link>
 
+        {/* GIFT WALLET */}
+        <GiftWallet userId={user.id} />
+
         <div className="mt-6">
           <CreateProject userId={user.id} />
         </div>
@@ -177,15 +184,44 @@ async function FeedContent() {
                     </div>
                   </Link>
 
-                  {/* Direct Message Button */}
-                  {post.creator_id !== user.id && (
-                    <MessageButton receiverId={post.creator_id} />
-                  )}
+                  {/* Direct Message + Post Options Menu */}
+                  <div className="flex items-center gap-2">
+                    {post.creator_id !== user.id && (
+                      <MessageButton receiverId={post.creator_id} />
+                    )}
+                    <PostOptions postId={post.id} isOwner={post.creator_id === user.id} />
+                  </div>
                 </div>
                 
                 <h4 className="text-xl font-bold text-[#0F380F] font-serif mb-2">{post.title}</h4>
                 <p className="text-[#1A2E1A] mb-4">{post.description}</p>
                 
+                {/* TOTAL RAISED */}
+                {post.gifts && post.gifts.length > 0 && (
+                  <div className="flex items-center justify-between bg-[#D8E9A8]/30 rounded-xl p-3 border border-[#4E9F3D]/30 mb-4">
+                    <span className="text-sm font-bold text-[#0F380F]">💰 Total Raised</span>
+                    <span className="text-lg font-bold text-[#0F380F]">
+                      ${post.gifts.reduce((sum: number, g: any) => sum + Number(g.amount || 0), 0).toFixed(2)} USD
+                    </span>
+                  </div>
+                )}
+
+                {/* GIFTS RECEIVED */}
+                {post.gifts && post.gifts.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {['kabeji', 'chai', 'simba', 'taji', 'malaika'].map(type => {
+                      const count = post.gifts.filter((g: any) => g.gift_type === type).length
+                      if (count === 0) return null
+                      const emojiMap: any = { kabeji: '🥬', chai: '☕', simba: '🦁', taji: '👑', malaika: '👼' }
+                      return (
+                        <span key={type} className="bg-[#FFB703]/20 text-[#0F380F] px-3 py-1 rounded-full text-sm font-bold border border-[#FFB703]/40 flex items-center gap-1">
+                          <span className="text-base">{emojiMap[type]}</span> × {count}
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+
                 {/* SMART MEDIA RENDERER */}
                 {post.post_type === 'project' && post.artifact_url && (
                   <div className="mt-4 rounded-xl overflow-hidden border border-[#E2E8E2]">
@@ -204,13 +240,17 @@ async function FeedContent() {
                   </div>
                 )}
 
-                {/* LIKE BUTTON */}
-                <div className="mt-4 flex items-center gap-4">
+                {/* LIKE BUTTON + GIFT BUTTON + SHARE BUTTON */}
+                <div className="mt-4 flex items-center gap-6">
                   <LikeButton 
                     projectId={post.id} 
                     initialLikes={post.likes?.length || 0} 
                     initialUserLiked={post.likes?.some((l: any) => l.user_id === user.id) || false} 
                   />
+                  {post.creator_id !== user.id && (
+                    <GiftButton projectId={post.id} receiverId={post.creator_id} />
+                  )}
+                  <ShareButton projectId={post.id} title={post.title} />
                 </div>
 
                 {/* JOIN TEAM OR WORKSPACE BUTTON */}
